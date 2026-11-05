@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div><h2 class="mb-1">Cargo Load Distribution Optimizer</h2><p class="text-muted mb-0">Balance package placement across four container zones while respecting the rated payload capacity.</p></div>
+  <span class="badge text-bg-info">Largest-first balancing</span>
+</div>
+<div class="alert alert-warning"><b>Safety note:</b> This tool redistributes cargo; it does not reduce the physical weight of the goods. Never exceed the container's rated payload, floor limits, axle limits or legal vehicle limits. Follow the carrier's loading plan and secure every package.</div>
+<div class="row g-4">
+ <div class="col-lg-5">
+  <div class="panel">
+   <h5>Enter package weights</h5>
+   <form method="post">
+    <label class="form-label mt-2">Approved container</label>
+    <select class="form-select" name="container_id" required>
+      <option value="">Select container</option>
+      {% for c in containers %}<option value="{{ c.id }}" {% if selected_id|string == c.id|string %}selected{% endif %}>{{ c.container_code }} · {{ c.container_type }} · Capacity {{ '%.1f'|format(c.max_weight) }} kg</option>{% endfor %}
+    </select>
+    <label class="form-label mt-3">Individual package weights (kg)</label>
+    <textarea class="form-control" name="package_weights" rows="6" placeholder="Example: 120, 95, 80, 75, 60, 45, 30" required>{{ raw_weights }}</textarea>
+    <div class="form-text">Enter one weight per package, separated by commas or new lines. Maximum 200 packages.</div>
+    <button class="btn btn-primary mt-3 w-100">Generate balanced loading plan</button>
+   </form>
+  </div>
+ </div>
+ <div class="col-lg-7">
+ {% if result %}
+  <div class="panel">
+   <div class="d-flex justify-content-between align-items-center"><h5>Optimized loading plan</h5><span class="badge text-bg-success">Capacity check passed</span></div>
+   <div class="row g-3 my-2">
+    <div class="col-6 col-md-3"><div class="small text-muted">Total cargo</div><h4>{{ result.total_weight }} kg</h4></div>
+    <div class="col-6 col-md-3"><div class="small text-muted">Capacity</div><h4>{{ result.capacity }} kg</h4></div>
+    <div class="col-6 col-md-3"><div class="small text-muted">Remaining</div><h4>{{ result.remaining_capacity }} kg</h4></div>
+    <div class="col-6 col-md-3"><div class="small text-muted">Utilization</div><h4>{{ result.utilization }}%</h4></div>
+   </div>
+   <div class="progress mb-3" role="progressbar" aria-valuenow="{{ result.utilization }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ result.utilization }}%"></div></div>
+   <p class="mb-2">Load imbalance indicator: <b>{{ result.imbalance }}%</b> <span class="text-muted small">(difference between heaviest and lightest zone relative to average zone load)</span></p>
+   <div class="row g-3">
+    {% for z in result.zones %}<div class="col-6"><div class="border rounded p-3 h-100"><div class="fw-semibold">Zone {{ loop.index }}</div><div class="fs-4">{{ '%.2f'|format(z.weight) }} kg</div><div class="small text-muted">{{ z.packages|length }} packages</div><div class="small mt-2">{% for p in z.packages %}#{{ p.package }} ({{ p.weight }} kg){% if not loop.last %}, {% endif %}{% endfor %}</div></div></div>{% endfor %}
+   </div>
+   <div class="alert alert-info mt-3 mb-0">Use this as a planning aid only. The four zones are a simplified model, not certified axle or floor-load calculations. A qualified loading operator must verify the actual vehicle/container geometry and securement.</div>
+  </div>
+ {% else %}
+  <div class="panel h-100 d-flex flex-column justify-content-center"><h5>How the optimizer works</h5><ol class="mb-0"><li>Checks total package weight against the selected container's rated capacity.</li><li>Sorts packages from heaviest to lightest.</li><li>Places each next package in the currently lightest of four zones.</li><li>Displays zone weights, package assignments and remaining payload.</li><li>Saves the generated plan in MySQL for review.</li></ol></div>
+ {% endif %}
+ </div>
+</div>
+{% if history %}<div class="panel mt-4"><h5>Previous loading plans</h5><div class="table-responsive"><table class="table"><thead><tr><th>Container</th><th>Total weight</th><th>Capacity</th><th>Imbalance</th><th>Created</th></tr></thead><tbody>{% for h in history %}<tr><td>{{ h.container_code }}</td><td>{{ h.total_weight }} kg</td><td>{{ h.capacity_weight }} kg</td><td>{{ h.imbalance_percent }}%</td><td>{{ h.created_at }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+{% endblock %}
